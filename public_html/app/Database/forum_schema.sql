@@ -553,3 +553,17 @@ CREATE TABLE oauth_providers (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY unique_provider (provider, provider_id)
 );
+
+-- Добавить в конец файла:
+CREATE TABLE oauth_providers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    provider_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_provider (provider, provider_id)
+) ENGINE=InnoDB;
+
+-- Добавить индекс:
+ALTER TABLE user_view_stats ADD INDEX idx_user_created (user_id, created_at);

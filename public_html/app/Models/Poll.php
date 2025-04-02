@@ -12,52 +12,28 @@ class Poll {
         $this->db = $db;
     }
 
-    public function create(
-        int $threadId,
-        string $question,
-        array $options,
-        bool $isAnonymous = false,
-        bool $isMultiple = false,
-        ?string $endDate = null
-    ): int {
-        $this->db->beginTransaction();
-        
-        try {
-            $this->db->query(
-                "INSERT INTO polls 
-                 (thread_id, question, is_anonymous, is_multiple, ends_at)
-                 VALUES (:thread_id, :question, :anon, :multi, :ends_at)",
-                [
-                    'thread_id' => $threadId,
-                    'question' => $question,
-                    'anon' => $isAnonymous,
-                    'multi' => $isMultiple,
-                    'ends_at' => $endDate
-                ]
-            );
-            
-            $pollId = $this->db->lastInsertId();
-            
-            foreach ($options as $option) {
-                $this->db->query(
-                    "INSERT INTO poll_options (poll_id, text)
-                     VALUES (:poll_id, :text)",
-                    ['poll_id' => $pollId, 'text' => $option]
-                );
-            }
-            
-            $this->db->commit();
-            return $pollId;
-        } catch (\Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+    public function isActive(int $pollId): bool {
+        $poll = $this->db->query(
+            "SELECT ends_at FROM polls WHERE id = :id",
+            ['id' => $pollId]
+        )->fetch();
+        return !$poll['ends_at'] || strtotime($poll['ends_at']) > time();
     }
-}
-public function isActive(int $pollId): bool {
-    $poll = $this->db->query(
-        "SELECT ends_at FROM polls WHERE id = :id",
-        ['id' => $pollId]
-    )->fetch();
-    return !$poll['ends_at'] || strtotime($poll['ends_at']) > time();
+
+    public function addVote(int $pollId, int $optionId, int $userId): bool {
+        if (!$this->isActive($pollId)) {
+            return false;
+        }
+
+        return $this->db->query(
+            "INSERT INTO poll_votes (poll_id, option_id, user_id) 
+             VALUES (:poll_id, :option_id, :user_id)
+             ON DUPLICATE KEY UPDATE option_id = VALUES(option_id)",
+            [
+                'poll_id' => $pollId,
+                'option_id' => $optionId,
+                'user_id' => $userId
+            ]
+        )->rowCount() > 0;
+    }
 }
