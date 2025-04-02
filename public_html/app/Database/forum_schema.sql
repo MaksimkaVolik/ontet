@@ -319,3 +319,217 @@ CREATE TABLE partner_profiles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Вместо:
+SELECT * FROM posts WHERE thread_id = X;
+-- Используй:
+SELECT p.*, u.username FROM posts p 
+JOIN users u ON p.user_id = u.id 
+WHERE p.thread_id = X;
+
+CREATE TABLE reaction_types (
+    id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(20) UNIQUE NOT NULL,
+    icon VARCHAR(30) NOT NULL,
+    color VARCHAR(7) DEFAULT '#666666'
+) ENGINE=InnoDB;
+
+CREATE TABLE post_reactions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    post_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    type_id TINYINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_reaction (post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (type_id) REFERENCES reaction_types(id),
+    INDEX idx_post (post_id)
+) ENGINE=InnoDB;
+
+-- Заполняем типы реакций
+INSERT INTO reaction_types (name, icon, color) VALUES 
+('like', 'thumb-up', '#3b82f6'),
+('dislike', 'thumb-down', '#ef4444'),
+('laugh', 'emoji-laughing', '#f59e0b'),
+('love', 'heart', '#ec4899'),
+('surprise', 'emoji-surprise', '#f97316'),
+('idea', 'lightbulb', '#10b981');
+
+ALTER TABLE posts ADD COLUMN parent_id INT UNSIGNED NULL AFTER thread_id;
+ALTER TABLE posts ADD FOREIGN KEY (parent_id) REFERENCES posts(id) ON DELETE CASCADE;
+CREATE INDEX idx_parent ON posts(parent_id);
+
+CREATE TABLE post_mentions (
+    post_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+-- Подписки
+CREATE TABLE subscriptions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    target_type ENUM('user', 'thread', 'category', 'group') NOT NULL,
+    target_id INT UNSIGNED NOT NULL,
+    notification_prefs JSON NOT NULL DEFAULT '{"email": true, "push": true}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_subscription (user_id, target_type, target_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_target (target_type, target_id)
+) ENGINE=InnoDB;
+
+-- Лента активности
+CREATE TABLE user_activities (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    activity_type ENUM('post', 'comment', 'reaction', 'thread') NOT NULL,
+    target_id INT UNSIGNED NOT NULL,
+    data JSON DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_activity (user_id, created_at),
+    INDEX idx_activity_type (activity_type, target_id)
+) ENGINE=InnoDB;
+
+-- Избранное
+CREATE TABLE user_bookmarks (
+    user_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, post_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+-- Группы
+CREATE TABLE groups (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    owner_id INT UNSIGNED NOT NULL,
+    is_public BOOLEAN DEFAULT true,
+    avatar VARCHAR(255),
+    cover VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Участники групп
+CREATE TABLE group_members (
+    group_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    role ENUM('member', 'moderator', 'admin') DEFAULT 'member',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_id, user_id),
+    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Приглашения
+CREATE TABLE group_invitations (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    group_id INT UNSIGNED NOT NULL,
+    inviter_id INT UNSIGNED NOT NULL,
+    invitee_email VARCHAR(255) NOT NULL,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    expires_at TIMESTAMP NULL,
+    status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_token (token)
+) ENGINE=InnoDB;
+-- Баланс пользователей
+CREATE TABLE user_points (
+    user_id INT UNSIGNED PRIMARY KEY,
+    points INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Транзакции
+CREATE TABLE point_transactions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    amount INT NOT NULL,
+    type ENUM('activity', 'purchase', 'donation', 'reward') NOT NULL,
+    reference_id INT UNSIGNED NULL,
+    description VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_type (user_id, type)
+) ENGINE=InnoDB;
+
+-- Премиум-статусы
+CREATE TABLE premium_statuses (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    icon VARCHAR(30) NOT NULL,
+    price INT NOT NULL,
+    duration_days INT NOT NULL,
+    features JSON NOT NULL
+) ENGINE=InnoDB;
+
+-- Активные статусы пользователей
+CREATE TABLE user_premium_statuses (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    status_id INT UNSIGNED NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (status_id) REFERENCES premium_statuses(id),
+    INDEX idx_user_expires (user_id, expires_at)
+) ENGINE=InnoDB;
+
+-- Таблица для хранения пользовательских предпочтений
+CREATE TABLE user_preferences (
+    user_id INT UNSIGNED PRIMARY KEY,
+    preferred_categories JSON DEFAULT '[]',
+    ignored_tags JSON DEFAULT '[]',
+    feed_algorithm ENUM('hot', 'new', 'top', 'personalized') DEFAULT 'hot',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Таблица для хранения статистики просмотров
+CREATE TABLE user_view_stats (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    thread_id INT UNSIGNED NOT NULL,
+    view_duration INT UNSIGNED DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE,
+    INDEX idx_user_thread (user_id, thread_id)
+) ENGINE=InnoDB;
+CREATE TABLE polls (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    thread_id INT UNSIGNED NOT NULL,
+    question VARCHAR(255) NOT NULL,
+    is_anonymous BOOLEAN DEFAULT false,
+    is_multiple BOOLEAN DEFAULT false,
+    ends_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE poll_options (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    poll_id INT UNSIGNED NOT NULL,
+    text VARCHAR(100) NOT NULL,
+    FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE poll_votes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    poll_id INT UNSIGNED NOT NULL,
+    option_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
+    FOREIGN KEY (option_id) REFERENCES poll_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_vote (poll_id, user_id, option_id),
+    INDEX idx_poll (poll_id)
+) ENGINE=InnoDB;

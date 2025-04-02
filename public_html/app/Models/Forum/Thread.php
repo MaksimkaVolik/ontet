@@ -10,6 +10,19 @@ class Thread {
         $this->db = new Database();
     }
 
+    public function search($query) {
+        return $this->db->query(
+            "SELECT t.*, u.username, u.avatar 
+             FROM threads t
+             JOIN users u ON t.user_id = u.id
+             WHERE t.title LIKE :query
+             ORDER BY t.created_at DESC",
+            ['query' => "%$query%"]
+        )->fetchAll();
+    }
+
+    // Остальные методы класса...
+
     public function create($data) {
         $slug = $this->generateSlug($data['title']);
         $this->db->query("

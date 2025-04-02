@@ -4,14 +4,21 @@ namespace Core;
 class Database {
     private $connection;
 
-    public function __construct($host, $username, $password, $database) {
+    public function __construct() {
+        $dsn = sprintf(
+            'mysql:host=%s;dbname=%s;charset=utf8mb4',
+            getenv('DB_HOST'),
+            getenv('DB_DATABASE')
+        );
+
         $this->connection = new \PDO(
-            "mysql:host=$host;dbname=$database;charset=utf8mb4",
-            $username,
-            $password,
+            $dsn,
+            getenv('DB_USERNAME'),
+            getenv('DB_PASSWORD'),
             [
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                \PDO::ATTR_EMULATE_PREPARES => false
             ]
         );
     }
@@ -21,6 +28,4 @@ class Database {
         $stmt->execute($params);
         return $stmt;
     }
-
-    // Другие методы работы с БД...
 }

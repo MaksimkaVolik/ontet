@@ -10,36 +10,28 @@ class AuthController extends Controller {
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
-                // 1. Проверка CSRF-токена
-                if (!isset($_POST['csrf_token'])) {
-                    throw new \Exception('Ошибка безопасности: отсутствует токен');
+                CSRF::validate($_POST['csrf_token'] ?? '');
+
+                $user = (new User())->login(
+                    trim($_POST['email']),
+                    $_POST['password']
+                );
+
+                if ($user) {
+                    session_regenerate_id(true);
+                    
+                    $_SESSION = [
+                        'user_id' => $user['id'],
+                        'username' => $user['username'],
+                        'ip' => $_SERVER['REMOTE_ADDR'],
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT']
+                    ];
+
+                    header('Location: /dashboard');
+                    exit;
                 }
-                CSRF::validate($_POST['csrf_token']);
 
-                // 2. Валидация полей
-                $email = trim($_POST['email'] ?? '');
-                $password = $_POST['password'] ?? '';
-                
-                if (empty($email) || empty($password)) {
-                    throw new \Exception('Все поля обязательны для заполнения');
-                }
-
-                // 3. Аутентификация
-                $user = (new User())->login($email, $password);
-                if (!$user) {
-                    throw new \Exception('Неверные учетные данные');
-                }
-
-                // 4. Установка сессии
-                $_SESSION = [
-                    'user_id' => $user['id'],
-                    'username' => $user['username'],
-                    'avatar' => $user['avatar'] ?? '/images/default-avatar.png',
-                    'ip' => $_SERVER['REMOTE_ADDR']
-                ];
-
-                header('Location: /dashboard');
-                exit;
+                throw new \Exception('Неверные учетные данные');
 
             } catch (\Exception $e) {
                 $error = $e->getMessage();
@@ -51,7 +43,6 @@ class AuthController extends Controller {
             'csrf_token' => CSRF::generate()
         ]);
     }
-
     public function register() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {

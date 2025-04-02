@@ -45,3 +45,12 @@ class RedisCache {
         return $this->redis->del($this->prefix . $key) > 0;
     }
 }
+// Пример в ForumController
+public function index() {
+    $cache = new \Core\Cache();
+    $categories = $cache->get('forum_categories', function() {
+        return (new \App\Models\Forum\Category())->getAllWithThreadsCount();
+    }, 3600);
+    
+    View::render('forum/index.php', ['categories' => $categories]);
+}
