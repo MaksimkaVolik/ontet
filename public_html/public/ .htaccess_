@@ -1,0 +1,25 @@
+# Файл: ~/otvetforum.ru/public_html/.htaccess
+<IfModule mod_rewrite.c>
+    Options -Indexes +FollowSymLinks
+    RewriteEngine On
+    RewriteBase /
+    
+    # Перенаправление на HTTPS
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # Правила для фронт-контроллера
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [L,QSA]
+    
+    # Защита от горячинга
+    RewriteCond %{HTTP_HOST} !^otvetforum\.ru$ [NC]
+    RewriteRule ^(.*)$ https://otvetforum.ru/$1 [L,R=301]
+</IfModule>
+
+<IfModule mod_php.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size 20M
+    php_value memory_limit 256M
+</IfModule>

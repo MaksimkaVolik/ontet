@@ -567,3 +567,18 @@ CREATE TABLE oauth_providers (
 
 -- Добавить индекс:
 ALTER TABLE user_view_stats ADD INDEX idx_user_created (user_id, created_at);
+
+-- В файле database/forum_schema.sql
+CREATE TABLE users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE INDEX uq_email (email),
+    UNIQUE INDEX uq_username (username),
+    INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
