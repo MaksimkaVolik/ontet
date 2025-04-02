@@ -18,7 +18,9 @@ class FeedAlgorithm {
     public function getPersonalizedFeed(int $userId, int $limit = 25): array {
         $cacheKey = "user_{$userId}_feed";
         
-        return $this->cache->get($cacheKey, function() use ($userId, $limit) {
+       return $this->cache->get($cacheKey, function() use ($userId, $limit) {
+    // запрос
+}, 60); // 1 минута вместо 5 {
             $prefs = $this->getUserPreferences($userId);
             
             $query = match($prefs['feed_algorithm']) {
@@ -35,16 +37,13 @@ class FeedAlgorithm {
         }, 300);
     }
 
-    private function getUserPreferences(int $userId): array {
-        return $this->db->query(
-            "SELECT * FROM user_preferences WHERE user_id = :user_id",
-            ['user_id' => $userId]
-        )->fetch() ?? [
-            'feed_algorithm' => 'hot',
-            'preferred_categories' => '[]',
-            'ignored_tags' => '[]'
-        ];
-    }
+   private function getPersonalizedQuery(int $userId): string {
+    return "SELECT t.* FROM threads t
+            JOIN (SELECT id FROM threads ORDER BY created_at DESC LIMIT 1000) as recent
+            ON t.id = recent.id
+            WHERE /* условия */
+            ORDER BY RAND() LIMIT :limit";
+}
 
     private function getHotContentQuery(): string {
         return "SELECT t.*, 

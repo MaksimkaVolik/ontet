@@ -54,3 +54,10 @@ class Poll {
         }
     }
 }
+public function isActive(int $pollId): bool {
+    $poll = $this->db->query(
+        "SELECT ends_at FROM polls WHERE id = :id",
+        ['id' => $pollId]
+    )->fetch();
+    return !$poll['ends_at'] || strtotime($poll['ends_at']) > time();
+}

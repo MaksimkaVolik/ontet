@@ -42,6 +42,12 @@ class Thread {
     public function findBySlug($slug) {
         $thread = $this->db->query("
             SELECT t.*, u.username, u.avatar, u.status,
+            public function search($query) {
+    return $this->db->query(
+        "SELECT * FROM threads WHERE title LIKE :query",
+        ['query' => "%$query%"]
+    )->fetchAll();
+}
                    c.title as category_title, c.slug as category_slug
             FROM threads t
             JOIN users u ON t.user_id = u.id
